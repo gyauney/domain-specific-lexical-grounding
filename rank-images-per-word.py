@@ -1,7 +1,6 @@
-# wiki-rank-images-per-word.py
+# rank-images-per-word.py
 # 
-# Process EntSharp results for multimodal Wikipedia dataset
-# by calculating pairwise distances between word and image embeddings.
+# Process EntSharp results by calculating pairwise distances between word and image embeddings.
 # Input: image embeddings and learned word embeddings
 # Output: list of top image filenames for each word
 
@@ -23,13 +22,18 @@ def parse_args():
         type=str)
 
     parser.add_argument(
-        '--name',
+        '--output_dir',
         type=str)
 
     parser.add_argument(
         '--word_embeddings',
         type=str)
 
+    parser.add_argument(
+        '--image2row',
+        type=str)
+
+    # for wikipedia results only
     parser.add_argument(
         '--image_names_in_order',
         type=str)
@@ -44,25 +48,35 @@ def parse_args():
 def main():
     args = parse_args()
 
-    save_dir = './results_{}'.format(args.name)
+    save_dir = args.output_dir
     if not os.path.exists(save_dir):
-        print('Results directory {} does not exist.'.format(save_dir))
-        exit()
+        os.makedirs(save_dir)
     print('Saving results in: {}'.format(save_dir))
 
     with open(args.word2col, 'r') as f:
         word_to_col = json.load(f)
 
-    print('Loading list of image names.')
+    print('Loading image names.')
     image_names_in_order = []
-    with open(args.image_names_in_order, 'r') as f:
-        image_names_in_order = json.load(f)
+    if args.image_names_in_order == None and args.image2row == None:
+        print('Error: Need to specify either --image_names_in_order or --image2row.')
+        exit()
+    elif args.image_names_in_order != None and args.image2row != None:
+        print('Error: Need to specify only one of either --image_names_in_order or --image2row.')
+        exit()
+    elif args.image_names_in_order != None and args.image2row == None:
+        # for reproducing wikipedia results
+        with open(args.image_names_in_order, 'r') as f:
+            image_names_in_order = json.load(f)
+    elif args.image_names_in_order == None and args.image2row != None:
+        with open(args.image2row, 'r') as f:
+            image_to_index = json.load(f)
+        index_to_image = {i: im for im, i in image_to_index.items()}
+        image_names_in_order = [index_to_image[i] for i in range(len(index_to_image))]
 
     # load and normalize image embeddings
     print('Loading image embeddings.')
-    image_embeddings = np.load(args.image_features)
-    normalizer = 1.0 / np.sqrt(np.sum(image_embeddings ** 2, axis=1))
-    image_embeddings *= normalizer[:, np.newaxis]
+    image_embeddings = np.load(args.image_features, mmap_mode='r')
 
     num_clusters = len(word_to_col)
     num_images = image_embeddings.shape[0]

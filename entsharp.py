@@ -30,24 +30,27 @@ def parse_args():
         default=100)
 
     parser.add_argument(
-        '--name',
+        '--output_dir',
         type=str)
+
+    parser.add_argument(
+        '--average_baseline',
+        default=False,
+        action='store_true')
 
     return parser.parse_args()
 
 def main():
     args = parse_args()
 
-    save_dir = './results_{}'.format(args.name)
+    save_dir = args.output_dir
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
-    # load and normalize image embeddings
+    # load l2-normalized image embeddings
     print('Loading image embeddings.')
-    image_embeddings = np.load(args.image_features)
-    normalizer = 1.0 / np.sqrt(np.sum(image_embeddings ** 2, axis=1))
-    image_embeddings *= normalizer[:, np.newaxis]
-    
+    image_embeddings = np.load(args.image_features, mmap_mode='r')
+
     print('Loading image-word co-occurrence matrix.')
     image_word_cooccurrences = scipy.sparse.load_npz(args.image_word_cooccurrences).toarray()
     print(image_word_cooccurrences.shape)
@@ -83,8 +86,9 @@ def main():
     # and each row is a membership distribution over clusters
     # with 0s for non-co-occurring image/word pairs
 
-    print('Saving average baseline word embeddings!')
-    np.save('{}/word-embeddings_average-zero-iter.npy'.format(save_dir), centroids)
+    if args.average_baseline:
+        print('Saving average baseline word embeddings!')
+        np.save('{}/word-embeddings_average-zero-iter.npy'.format(save_dir), centroids)
 
     for iteration in range(1, args.n_iterations + 1):
         print('Iteration {}/{}'.format(iteration, args.n_iterations))
